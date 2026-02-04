@@ -138,7 +138,6 @@ function buildReviewHtml(banners: Banner[], id: string) {
       }
 
       .topbar {
-        position: relative;
         padding: 24px;
       }
 
@@ -153,12 +152,15 @@ function buildReviewHtml(banners: Banner[], id: string) {
       }
 
       .logo {
-        position: absolute;
-        left: 40px;
-        top: 24px;
-        width: 9%;
-        max-width: 120px;
+        width: 160px;
         height: auto;
+        margin-left: 40px;
+      }
+
+      .topbar-grid {
+        display: grid;
+        grid-template-columns: 200px 1fr 200px;
+        align-items: center;
       }
 
       header {
@@ -194,7 +196,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
       main {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 0 24px 48px;
+        padding: 48px 24px 48px;
       }
 
       .grid {
@@ -279,9 +281,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
         font-size: 13px;
         padding: 8px 16px;
         cursor: pointer;
-        position: absolute;
-        right: 24px;
-        top: 24px;
+        justify-self: end;
       }
 
       .back-button[hidden] {
@@ -326,15 +326,16 @@ function buildReviewHtml(banners: Banner[], id: string) {
   </head>
   <body>
     <div class="topbar">
-      <img src="/rkh-logo.png" alt="RKH" class="logo" />
-      <div class="topbar-center">
-        <p class="eyebrow">Banner Review</p>
-        <h1>Campaign Preview</h1>
-        <p class="subtitle">${id}</p>
+      <div class="topbar-grid">
+        <img src="/rkh-logo.png" alt="RKH" class="logo" />
+        <div class="topbar-center">
+          <p class="eyebrow">BannerShare</p>
+          <p class="subtitle">${id}</p>
+        </div>
+        <button id="backButton" class="back-button" type="button" hidden>
+          Back to all sizes
+        </button>
       </div>
-      <button id="backButton" class="back-button" type="button" hidden>
-        Back to all sizes
-      </button>
     </div>
     <main>
       <div id="grid" class="grid"></div>
