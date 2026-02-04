@@ -320,7 +320,7 @@ export default function Home() {
     <PageContainer
       header={
         <AppHeader>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+          <p className="text-xl uppercase tracking-[0.2em] font-light text-slate-500">
             BannerShare
           </p>
         </AppHeader>

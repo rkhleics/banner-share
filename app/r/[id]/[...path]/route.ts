@@ -174,11 +174,12 @@ function buildReviewHtml(banners: Banner[], id: string) {
       }
 
       .eyebrow {
-        font-size: 11px;
+        font-size: 20px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         color: var(--muted);
         margin: 0 0 6px 0;
+        font-weight: 300;
       }
 
       h1 {
@@ -329,7 +330,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
       <div class="topbar-grid">
         <img src="/rkh-logo.png" alt="RKH" class="logo" />
         <div class="topbar-center">
-          <p class="eyebrow">BannerShare</p>
+        <p class="eyebrow">BannerShare</p>
           <p class="subtitle">${id}</p>
         </div>
         <button id="backButton" class="back-button" type="button" hidden>
