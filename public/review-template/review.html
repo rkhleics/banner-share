@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Banner Review</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --muted: #64748b;
+        --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        --radius: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 6px 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 600;
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 48px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+
+      .banner-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .banner-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .banner-title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .controls {
+        display: inline-flex;
+        gap: 8px;
+      }
+
+      .control-button {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #1e293b;
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 6px 12px;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .control-button:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+      }
+
+      .control-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .frame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        background: #f8fafc;
+      }
+
+      iframe {
+        border: 1px solid var(--border);
+        background: #ffffff;
+        max-width: 100%;
+      }
+
+      .back-button {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #1e293b;
+        border-radius: 999px;
+        font-size: 13px;
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+
+      .back-button[hidden] {
+        display: none;
+      }
+
+      body.is-focused .grid {
+        display: block;
+      }
+
+      body.is-focused .banner-card {
+        display: none;
+      }
+
+      body.is-focused .banner-card.is-active {
+        display: flex;
+        margin: 0 auto;
+        max-width: 900px;
+        transform: scale(1.03);
+      }
+
+      @media (max-width: 640px) {
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .controls {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Banner Review</p>
+        <h1>Campaign Preview</h1>
+      </div>
+      <button id="backButton" class="back-button" type="button" hidden>
+        Back to all sizes
+      </button>
+    </header>
+    <main>
+      <div id="grid" class="grid"></div>
+    </main>
+    <script>
+      const banners = [
+        { id: "300x250", label: "300×250", path: "./300x250/index.html" },
+        { id: "160x600", label: "160×600", path: "./160x600/index.html" }
+      ];
+
+      const grid = document.getElementById("grid");
+      const backButton = document.getElementById("backButton");
+      let activeCard = null;
+      let lastFocused = null;
+
+      const focusableSelector =
+        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+
+      function getTicker(iframe) {
+        const win = iframe.contentWindow;
+        if (!win) return null;
+        if (win.createjs && win.createjs.Ticker) {
+          return win.createjs.Ticker;
+        }
+        return null;
+      }
+
+      function syncPauseButton(button, iframe) {
+        const ticker = getTicker(iframe);
+        if (!ticker) {
+          button.disabled = true;
+          button.textContent = "Pause";
+          button.setAttribute("aria-pressed", "false");
+          return;
+        }
+        button.disabled = false;
+        button.textContent = ticker.paused ? "Play" : "Pause";
+        button.setAttribute("aria-pressed", String(ticker.paused));
+      }
+
+      function restartIframe(iframe) {
+        const src = iframe.getAttribute("src");
+        if (!src) return;
+        iframe.setAttribute("src", src);
+      }
+
+      function createCard(banner) {
+        const card = document.createElement("article");
+        card.className = "banner-card";
+        card.dataset.bannerId = banner.id;
+        card.tabIndex = -1;
+
+        const header = document.createElement("div");
+        header.className = "banner-header";
+
+        const title = document.createElement("div");
+        title.className = "banner-title";
+        title.textContent = banner.label;
+
+        const controls = document.createElement("div");
+        controls.className = "controls";
+
+        const restartButton = document.createElement("button");
+        restartButton.className = "control-button";
+        restartButton.type = "button";
+        restartButton.textContent = "Restart";
+
+        const pauseButton = document.createElement("button");
+        pauseButton.className = "control-button";
+        pauseButton.type = "button";
+        pauseButton.textContent = "Pause";
+        pauseButton.setAttribute("aria-pressed", "false");
+
+        const focusButton = document.createElement("button");
+        focusButton.className = "control-button";
+        focusButton.type = "button";
+        focusButton.textContent = "Focus";
+
+        controls.appendChild(restartButton);
+        controls.appendChild(pauseButton);
+        controls.appendChild(focusButton);
+
+        header.appendChild(title);
+        header.appendChild(controls);
+
+        const frame = document.createElement("div");
+        frame.className = "frame";
+
+        const iframe = document.createElement("iframe");
+        iframe.src = banner.path;
+        iframe.title = banner.label;
+        iframe.width = banner.id.split("x")[0] || "300";
+        iframe.height = banner.id.split("x")[1] || "250";
+        iframe.loading = "lazy";
+
+        frame.appendChild(iframe);
+        card.appendChild(header);
+        card.appendChild(frame);
+
+        restartButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          restartIframe(iframe);
+          setTimeout(() => syncPauseButton(pauseButton, iframe), 80);
+        });
+
+        pauseButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const ticker = getTicker(iframe);
+          if (!ticker) return;
+          ticker.paused = !ticker.paused;
+          syncPauseButton(pauseButton, iframe);
+        });
+
+        focusButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          location.hash = banner.id;
+        });
+
+        card.addEventListener("click", () => {
+          location.hash = banner.id;
+        });
+
+        iframe.addEventListener("load", () => syncPauseButton(pauseButton, iframe));
+
+        return card;
+      }
+
+      function setActiveCard(card) {
+        if (activeCard) {
+          activeCard.classList.remove("is-active");
+        }
+        activeCard = card;
+        if (activeCard) {
+          activeCard.classList.add("is-active");
+        }
+      }
+
+      function enterFocus(id) {
+        const card = document.querySelector(`[data-banner-id='${id}']`);
+        if (!card) return;
+        lastFocused = document.activeElement;
+        setActiveCard(card);
+        document.body.classList.add("is-focused");
+        backButton.hidden = false;
+        const focusable = card.querySelectorAll(focusableSelector);
+        if (focusable.length) {
+          focusable[0].focus();
+        } else {
+          card.focus();
+        }
+      }
+
+      function exitFocus() {
+        setActiveCard(null);
+        document.body.classList.remove("is-focused");
+        backButton.hidden = true;
+        if (lastFocused && lastFocused.focus) {
+          lastFocused.focus();
+        }
+      }
+
+      function syncFromHash() {
+        const id = location.hash.replace("#", "");
+        if (id) {
+          enterFocus(id);
+        } else {
+          exitFocus();
+        }
+      }
+
+      function clearHash() {
+        history.pushState("", document.title, window.location.pathname + window.location.search);
+        syncFromHash();
+      }
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          clearHash();
+        }
+
+        if (event.key === "Tab" && document.body.classList.contains("is-focused")) {
+          const card = activeCard;
+          if (!card) return;
+          const focusable = Array.from(card.querySelectorAll(focusableSelector));
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      });
+
+      backButton.addEventListener("click", clearHash);
+
+      banners.forEach((banner) => {
+        grid.appendChild(createCard(banner));
+      });
+
+      window.addEventListener("hashchange", syncFromHash);
+      syncFromHash();
+    </script>
+  </body>
+</html>
