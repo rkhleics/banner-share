@@ -140,8 +140,6 @@ function buildReviewHtml(banners: Banner[], id: string) {
       .topbar {
         position: relative;
         padding: 24px;
-        max-width: 1200px;
-        margin: 0 auto;
       }
 
       .topbar-center {
@@ -150,6 +148,8 @@ function buildReviewHtml(banners: Banner[], id: string) {
         align-items: center;
         gap: 6px;
         text-align: center;
+        max-width: 768px;
+        margin: 0 auto;
       }
 
       .logo {
@@ -279,6 +279,9 @@ function buildReviewHtml(banners: Banner[], id: string) {
         font-size: 13px;
         padding: 8px 16px;
         cursor: pointer;
+        position: absolute;
+        right: 24px;
+        top: 24px;
       }
 
       .back-button[hidden] {

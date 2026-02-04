@@ -4,6 +4,7 @@ import * as React from "react";
 import { unzipSync } from "fflate";
 
 import { Dropzone } from "@/components/dropzone";
+import { AppHeader } from "@/components/app-header";
 import { PageContainer } from "@/components/page-container";
 import { ReviewLinkPanel } from "@/components/review-link-panel";
 import { UploadProgress } from "@/components/upload-progress";
@@ -318,15 +319,15 @@ export default function Home() {
 
   return (
     <PageContainer
-      headerContent={
-        <>
+      header={
+        <AppHeader>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
             HTML5 Banner Review
           </p>
           <h1 className="text-3xl font-semibold text-slate-900">
             Upload a banner ZIP and get a single review link
           </h1>
-        </>
+        </AppHeader>
       }
     >
 
