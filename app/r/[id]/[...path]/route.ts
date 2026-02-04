@@ -330,8 +330,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
       <div class="topbar-grid">
         <img src="/rkh-logo.png" alt="RKH" class="logo" />
         <div class="topbar-center">
-        <p class="eyebrow">BannerShare</p>
-          <p class="subtitle">${id}</p>
+          <p class="eyebrow">BannerShare</p>
         </div>
         <button id="backButton" class="back-button" type="button" hidden>
           Back to all sizes

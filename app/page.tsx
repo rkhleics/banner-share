@@ -139,16 +139,21 @@ export default function Home() {
       let totalBytes = 0;
       let hasBannerHtml = false;
 
-      for (const [path, data] of Object.entries(entries)) {
-        if (path.endsWith("/")) continue;
-        if (path.startsWith("__MACOSX/") || path.includes("/__MACOSX/")) continue;
-        if (path.endsWith(".DS_Store") || path.includes("/.DS_Store")) continue;
+      const shouldSkipPath = (path: string) =>
+        path.endsWith("/") ||
+        path.startsWith("__MACOSX/") ||
+        path.includes("/__MACOSX/") ||
+        path.endsWith(".DS_Store") ||
+        path.includes("/.DS_Store");
+
+      const addEntry = (path: string, data: Uint8Array) => {
+        if (shouldSkipPath(path)) return true;
 
         const normalized = normalizeUploadPath(path);
         if (!normalized) {
           setError("ZIP contains invalid paths");
           setPhase("error");
-          return;
+          return false;
         }
 
         if (normalized.includes("/") && normalized.toLowerCase().endsWith(".html")) {
@@ -159,7 +164,7 @@ export default function Home() {
         if (bytes > MAX_FILE_SIZE) {
           setError("One or more files exceed 5 MB");
           setPhase("error");
-          return;
+          return false;
         }
 
         totalBytes += bytes;
@@ -169,6 +174,34 @@ export default function Home() {
           data,
           contentType: getContentType(normalized)
         });
+        return true;
+      };
+
+      const processEntries = (entriesMap: Record<string, Uint8Array>, depth = 0) => {
+        for (const [path, data] of Object.entries(entriesMap)) {
+          if (shouldSkipPath(path)) continue;
+
+          if (path.toLowerCase().endsWith(".zip") && depth < 1) {
+            try {
+              const nested = unzipSync(data);
+              processEntries(nested, depth + 1);
+              continue;
+            } catch {
+              setError("Unable to read a nested ZIP file");
+              setPhase("error");
+              return false;
+            }
+          }
+
+          if (!addEntry(path, data)) {
+            return false;
+          }
+        }
+        return true;
+      };
+
+      if (!processEntries(entries)) {
+        return;
       }
 
       if (!hasBannerHtml) {
