@@ -362,17 +362,100 @@ function buildReviewHtml(banners: Banner[], id: string) {
         return null;
       }
 
-      function syncPauseButton(button, iframe) {
+      function getStage(iframe) {
+        const win = iframe.contentWindow;
+        if (!win) return null;
+        if (win.stage) return win.stage;
+        const an = win.AdobeAn;
+        if (an) {
+          if (typeof an.getComposition === "function" && an.compositions) {
+            const ids = Object.keys(an.compositions);
+            if (ids.length) {
+              const comp = an.getComposition(ids[0]);
+              if (comp && typeof comp.getStage === "function") {
+                return comp.getStage();
+              }
+            }
+          }
+        }
+        return null;
+      }
+
+      function getExportRoot(iframe) {
+        const win = iframe.contentWindow;
+        if (!win) return null;
+        return win.exportRoot || null;
+      }
+
+      function getPlaybackState(iframe) {
+        const stage = getStage(iframe);
+        if (stage && typeof stage.tickEnabled === "boolean") {
+          return !stage.tickEnabled;
+        }
         const ticker = getTicker(iframe);
-        if (!ticker) {
+        if (ticker) {
+          return !!ticker.paused;
+        }
+        const root = getExportRoot(iframe);
+        if (root && typeof root.paused === "boolean") {
+          return root.paused;
+        }
+        return null;
+      }
+
+      function setPlaybackState(iframe, paused) {
+        const ticker = getTicker(iframe);
+        const stage = getStage(iframe);
+        let handled = false;
+        if (stage) {
+          if (typeof stage.setAutoPlay === "function") {
+            stage.setAutoPlay(!paused);
+            handled = true;
+          }
+          if (typeof stage.tickEnabled === "boolean") {
+            stage.tickEnabled = !paused;
+            handled = true;
+          }
+          if (paused && typeof stage.stop === "function") {
+            stage.stop();
+            handled = true;
+          }
+          if (!paused && typeof stage.play === "function") {
+            stage.play();
+            handled = true;
+          }
+        }
+        const root = getExportRoot(iframe);
+        if (root && typeof root.stop === "function" && typeof root.play === "function") {
+          if (paused) {
+            root.stop();
+          } else {
+            root.play();
+          }
+          handled = true;
+        }
+        if (ticker) {
+          if (typeof ticker.setPaused === "function") {
+            ticker.setPaused(paused);
+          } else {
+            ticker.paused = paused;
+          }
+          handled = true;
+        }
+        return handled;
+      }
+
+      function syncPauseButton(button, iframe) {
+        const paused = getPlaybackState(iframe);
+        if (paused === null) {
           button.disabled = true;
           button.textContent = "Pause";
           button.setAttribute("aria-pressed", "false");
           return;
         }
         button.disabled = false;
-        button.textContent = ticker.paused ? "Play" : "Pause";
-        button.setAttribute("aria-pressed", String(ticker.paused));
+        button.textContent = paused ? "Play" : "Pause";
+        button.setAttribute("aria-pressed", String(paused));
       }
 
       function restartIframe(iframe) {
@@ -444,9 +527,10 @@ function buildReviewHtml(banners: Banner[], id: string) {
 
         pauseButton.addEventListener("click", (event) => {
           event.stopPropagation();
-          const ticker = getTicker(iframe);
-          if (!ticker) return;
-          ticker.paused = !ticker.paused;
+          const current = getPlaybackState(iframe);
+          if (current === null) return;
+          const nextPaused = !current;
+          setPlaybackState(iframe, nextPaused);
           syncPauseButton(pauseButton, iframe);
         });
 
@@ -459,7 +543,17 @@ function buildReviewHtml(banners: Banner[], id: string) {
           location.hash = banner.id;
         });
 
-        iframe.addEventListener("load", () => syncPauseButton(pauseButton, iframe));
+        iframe.addEventListener("load", () => {
+          syncPauseButton(pauseButton, iframe);
+          let attempts = 0;
+          const poll = setInterval(() => {
+            attempts += 1;
+            syncPauseButton(pauseButton, iframe);
+            if (!pauseButton.disabled || attempts > 20) {
+              clearInterval(poll);
+            }
+          }, 250);
+        });
 
         return card;
       }
