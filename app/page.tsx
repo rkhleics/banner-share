@@ -146,6 +146,9 @@ export default function Home() {
         path.endsWith(".DS_Store") ||
         path.includes("/.DS_Store");
 
+      const joinPath = (prefix: string, path: string) =>
+        prefix ? `${prefix}/${path}` : path;
+
       const addEntry = (path: string, data: Uint8Array) => {
         if (shouldSkipPath(path)) return true;
 
@@ -177,14 +180,21 @@ export default function Home() {
         return true;
       };
 
-      const processEntries = (entriesMap: Record<string, Uint8Array>, depth = 0) => {
+      const processEntries = (
+        entriesMap: Record<string, Uint8Array>,
+        depth = 0,
+        prefix = ""
+      ) => {
         for (const [path, data] of Object.entries(entriesMap)) {
           if (shouldSkipPath(path)) continue;
 
-          if (path.toLowerCase().endsWith(".zip") && depth < 1) {
+          if (path.toLowerCase().endsWith(".zip") && depth < 2) {
             try {
               const nested = unzipSync(data);
-              processEntries(nested, depth + 1);
+              const zipName = path.split("/").pop() ?? path;
+              const baseName = zipName.replace(/\.zip$/i, "");
+              const nextPrefix = joinPath(prefix, baseName);
+              processEntries(nested, depth + 1, nextPrefix);
               continue;
             } catch {
               setError("Unable to read a nested ZIP file");
@@ -193,7 +203,8 @@ export default function Home() {
             }
           }
 
-          if (!addEntry(path, data)) {
+          const mergedPath = joinPath(prefix, path);
+          if (!addEntry(mergedPath, data)) {
             return false;
           }
         }

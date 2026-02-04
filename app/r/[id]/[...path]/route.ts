@@ -407,6 +407,14 @@ function buildReviewHtml(banners: Banner[], id: string) {
         const ticker = getTicker(iframe);
         const stage = getStage(iframe);
         let handled = false;
+        if (ticker) {
+          if (typeof ticker.setPaused === "function") {
+            ticker.setPaused(paused);
+          } else {
+            ticker.paused = paused;
+          }
+          handled = true;
+        }
         if (stage) {
           if (typeof stage.setAutoPlay === "function") {
             stage.setAutoPlay(!paused);
@@ -416,31 +424,6 @@ function buildReviewHtml(banners: Banner[], id: string) {
             stage.tickEnabled = !paused;
             handled = true;
           }
-          if (paused && typeof stage.stop === "function") {
-            stage.stop();
-            handled = true;
-          }
-          if (!paused && typeof stage.play === "function") {
-            stage.play();
-            handled = true;
-          }
-        }
-        const root = getExportRoot(iframe);
-        if (root && typeof root.stop === "function" && typeof root.play === "function") {
-          if (paused) {
-            root.stop();
-          } else {
-            root.play();
-          }
-          handled = true;
-        }
-        if (ticker) {
-          if (typeof ticker.setPaused === "function") {
-            ticker.setPaused(paused);
-          } else {
-            ticker.paused = paused;
-          }
-          handled = true;
         }
         return handled;
       }
