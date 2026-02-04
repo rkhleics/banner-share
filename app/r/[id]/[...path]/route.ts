@@ -667,7 +667,7 @@ export async function GET(
       return new Response("Not found", { status: 404 });
     }
 
-    const body = toWebStream(response.Body);
+    const body = toWebStream(response.Body) as unknown as ReadableStream;
     if (!body) {
       return new Response("Not found", { status: 404 });
     }
@@ -719,7 +719,7 @@ export async function GET(
         return new Response("Not found", { status: 404 });
       }
 
-      const metaBody = toWebStream(metaResponse.Body);
+      const metaBody = toWebStream(metaResponse.Body) as unknown as ReadableStream;
       if (!metaBody) {
         return new Response("Not found", { status: 404 });
       }

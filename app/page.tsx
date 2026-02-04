@@ -289,9 +289,10 @@ export default function Home() {
           }
 
           const { url } = (await signResponse.json()) as { url: string };
-          const blob = new Blob([fileEntry.data], {
-            type: fileEntry.contentType
-          });
+          const blob = new Blob(
+            [new Uint8Array(fileEntry.data)],
+            { type: fileEntry.contentType }
+          );
 
           const uploadResponse = await fetch(url, {
             method: "PUT",
