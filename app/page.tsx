@@ -21,8 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { MAX_FILE_SIZE, MAX_TOTAL_SIZE } from "@/lib/constants";
 import { normalizeUploadPath } from "@/lib/paths";
 
-const helperText =
-  "Upload a ZIP exported from Animate that includes review.html and size folders.";
+const helperText = "Upload a ZIP of animation files.";
 
 type UploadPhase = "idle" | "extracting" | "uploading" | "success" | "error";
 
@@ -329,12 +328,7 @@ export default function Home() {
     >
 
       <Card>
-        <CardHeader>
-          <CardTitle>Upload ZIP</CardTitle>
-          <CardDescription>
-            Drag and drop your export, or choose a ZIP from your computer.
-          </CardDescription>
-        </CardHeader>
+        <CardHeader />
         <CardContent className="flex flex-col gap-6">
           <Dropzone
             onFileSelect={handleFileSelect}
