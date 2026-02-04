@@ -95,7 +95,9 @@ function extractBanners(files: MetaFile[]) {
       const aH = Number(aMatch[2]);
       const bW = Number(bMatch[1]);
       const bH = Number(bMatch[2]);
-      return aW - bW || aH - bH;
+      const aArea = aW * aH;
+      const bArea = bW * bH;
+      return aArea - bArea || aW - bW || aH - bH;
     }
     if (aMatch) return -1;
     if (bMatch) return 1;
@@ -133,6 +135,30 @@ function buildReviewHtml(banners: Banner[], id: string) {
         font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
         background: var(--bg);
         color: var(--text);
+      }
+
+      .topbar {
+        position: relative;
+        padding: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .topbar-center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        text-align: center;
+      }
+
+      .logo {
+        position: absolute;
+        left: 40px;
+        top: 24px;
+        width: 9%;
+        max-width: 120px;
+        height: auto;
       }
 
       header {
@@ -197,6 +223,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
         padding: 12px 14px;
         background: #f8fafc;
         border-bottom: 1px solid var(--border);
+        gap: 12px;
       }
 
       .banner-title {
@@ -295,8 +322,9 @@ function buildReviewHtml(banners: Banner[], id: string) {
     </style>
   </head>
   <body>
-    <header>
-      <div>
+    <div class="topbar">
+      <img src="/rkh-logo.png" alt="RKH" class="logo" />
+      <div class="topbar-center">
         <p class="eyebrow">Banner Review</p>
         <h1>Campaign Preview</h1>
         <p class="subtitle">${id}</p>
@@ -304,7 +332,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
       <button id="backButton" class="back-button" type="button" hidden>
         Back to all sizes
       </button>
-    </header>
+    </div>
     <main>
       <div id="grid" class="grid"></div>
       <div id="empty" class="empty" hidden>No banner HTML files found.</div>
@@ -365,24 +393,24 @@ function buildReviewHtml(banners: Banner[], id: string) {
         const controls = document.createElement("div");
         controls.className = "controls";
 
-        const restartButton = document.createElement("button");
-        restartButton.className = "control-button";
-        restartButton.type = "button";
-        restartButton.textContent = "Restart";
-
         const pauseButton = document.createElement("button");
         pauseButton.className = "control-button";
         pauseButton.type = "button";
         pauseButton.textContent = "Pause";
         pauseButton.setAttribute("aria-pressed", "false");
 
+        const restartButton = document.createElement("button");
+        restartButton.className = "control-button";
+        restartButton.type = "button";
+        restartButton.textContent = "Restart";
+
         const focusButton = document.createElement("button");
         focusButton.className = "control-button";
         focusButton.type = "button";
         focusButton.textContent = "Focus";
 
-        controls.appendChild(restartButton);
         controls.appendChild(pauseButton);
+        controls.appendChild(restartButton);
         controls.appendChild(focusButton);
 
         header.appendChild(title);

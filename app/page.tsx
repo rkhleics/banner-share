@@ -317,15 +317,18 @@ export default function Home() {
   );
 
   return (
-    <PageContainer>
-      <div className="flex flex-col gap-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-          HTML5 Banner Review
-        </p>
-        <h1 className="text-3xl font-semibold text-slate-900">
-          Upload a banner ZIP and get a single review link
-        </h1>
-      </div>
+    <PageContainer
+      headerContent={
+        <>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+            HTML5 Banner Review
+          </p>
+          <h1 className="text-3xl font-semibold text-slate-900">
+            Upload a banner ZIP and get a single review link
+          </h1>
+        </>
+      }
+    >
 
       <Card>
         <CardHeader>
