@@ -273,24 +273,35 @@ export default function Home() {
 
       for (const fileEntry of files) {
         try {
+          const signResponse = await fetch("/api/sign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: uploadId,
+              path: fileEntry.path,
+              contentType: fileEntry.contentType
+            })
+          });
+
+          if (!signResponse.ok) {
+            const message = await readErrorMessage(signResponse);
+            throw new Error(message ?? "Unable to sign upload");
+          }
+
+          const { url } = (await signResponse.json()) as { url: string };
           const blob = new Blob(
             [new Uint8Array(fileEntry.data)],
             { type: fileEntry.contentType }
           );
 
-          const uploadResponse = await fetch("/api/upload", {
-            method: "POST",
-            headers: {
-              "Content-Type": fileEntry.contentType,
-              "x-upload-id": uploadId,
-              "x-upload-path": fileEntry.path
-            },
+          const uploadResponse = await fetch(url, {
+            method: "PUT",
+            headers: { "Content-Type": fileEntry.contentType },
             body: blob
           });
 
           if (!uploadResponse.ok) {
-            const message = await readErrorMessage(uploadResponse);
-            throw new Error(message ?? "A file failed to upload");
+            throw new Error("A file failed to upload");
           }
 
           uploadedBytes += fileEntry.bytes;
