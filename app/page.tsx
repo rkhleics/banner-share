@@ -180,7 +180,11 @@ export default function Home() {
               const nested = unzipSync(data);
               const zipName = path.split("/").pop() ?? path;
               const baseName = zipName.replace(/\.zip$/i, "");
-              const nextPrefix = joinPath(prefix, baseName);
+              const parentPath = path.split("/").slice(0, -1).join("/");
+              const nextPrefix = joinPath(
+                prefix,
+                joinPath(parentPath, baseName)
+              );
               processEntries(nested, depth + 1, nextPrefix);
               continue;
             } catch {

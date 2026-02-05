@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
 
 type MetaFile = { path: string; bytes?: number };
 
-type Banner = { id: string; label: string; path: string };
+type Banner = { id: string; label: string; path: string; key: string };
+
+type BannerGroup = { id: string; label: string; banners: Banner[] };
+
+type DisplayFile = { path: string; displayPath: string };
 
 function toWebStream(body: unknown) {
   if (!body) return null;
@@ -29,38 +33,21 @@ function sizeLabel(id: string) {
   return `${match[1]}x${match[2]}`;
 }
 
-function extractBanners(files: MetaFile[]) {
+function makeBannerKey(prefix: string | null, id: string) {
+  const raw = prefix ? `${prefix}/${id}` : id;
+  return encodeURIComponent(raw);
+}
+
+function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
   const sizePattern = /^\d+x\d+$/;
-  const topLevelFolders = new Set<string>();
-
-  for (const file of files) {
-    if (!file.path) continue;
-    const parts = file.path.split("/");
-    if (parts.length > 1 && parts[0]) {
-      topLevelFolders.add(parts[0]);
-    }
-  }
-
-  const commonPrefix =
-    topLevelFolders.size === 1 ? Array.from(topLevelFolders)[0] : null;
-
-  const stripPrefix = (path: string) => {
-    if (!commonPrefix) return path;
-    if (path.startsWith(`${commonPrefix}/`)) {
-      return path.slice(commonPrefix.length + 1);
-    }
-    return path;
-  };
-
   const bySize = new Map<string, { path: string; weight: number }>();
   const fallback: Banner[] = [];
 
   for (const file of files) {
     const path = file.path;
-    if (!path || !path.toLowerCase().endsWith(".html")) continue;
-    if (path === "review.html") continue;
-
-    const displayPath = stripPrefix(path);
+    const displayPath = file.displayPath;
+    if (!path || !displayPath.toLowerCase().endsWith(".html")) continue;
+    if (displayPath === "review.html") continue;
 
     const parts = displayPath.split("/");
     const folder = parts[0] ?? "";
@@ -76,14 +63,20 @@ function extractBanners(files: MetaFile[]) {
     }
 
     const id = folder || fileName.replace(/\.html$/i, "");
-    fallback.push({ id, label: sizeLabel(id), path: `./${path}` });
+    fallback.push({
+      id,
+      label: sizeLabel(id),
+      path: `./${path}`,
+      key: makeBannerKey(keyPrefix ?? null, id)
+    });
   }
 
   const banners: Banner[] = bySize.size
     ? Array.from(bySize.entries()).map(([id, data]) => ({
         id,
         label: sizeLabel(id),
-        path: `./${data.path}`
+        path: `./${data.path}`,
+        key: makeBannerKey(keyPrefix ?? null, id)
       }))
     : fallback;
 
@@ -107,8 +100,109 @@ function extractBanners(files: MetaFile[]) {
   return banners;
 }
 
-function buildReviewHtml(banners: Banner[], id: string) {
-  const bannerData = JSON.stringify(banners);
+function extractBannerGroups(files: MetaFile[]) {
+  const sizePattern = /^\d+x\d+$/;
+  const topLevelFolders = new Set<string>();
+
+  for (const file of files) {
+    if (!file.path) continue;
+    const parts = file.path.split("/");
+    if (parts.length > 1 && parts[0]) {
+      topLevelFolders.add(parts[0]);
+    }
+  }
+
+  const commonPrefix =
+    topLevelFolders.size === 1 ? Array.from(topLevelFolders)[0] : null;
+
+  const stripPrefix = (path: string) => {
+    if (!commonPrefix) return path;
+    if (path.startsWith(`${commonPrefix}/`)) {
+      return path.slice(commonPrefix.length + 1);
+    }
+    return path;
+  };
+
+  const displayFiles: DisplayFile[] = [];
+  const groupNames = new Set<string>();
+
+  for (const file of files) {
+    const path = file.path;
+    if (!path || !path.toLowerCase().endsWith(".html")) continue;
+    if (path === "review.html") continue;
+
+    const displayPath = stripPrefix(path);
+    const parts = displayPath.split("/");
+    const folder = parts[0] ?? "";
+    if (folder && !sizePattern.test(folder)) {
+      groupNames.add(folder);
+    }
+
+    displayFiles.push({ path, displayPath });
+  }
+
+  if (!displayFiles.length) {
+    return [] as BannerGroup[];
+  }
+
+  const shouldGroup = groupNames.size > 1;
+  if (!shouldGroup) {
+    return [
+      {
+        id: "all",
+        label: "",
+        banners: extractBannersFromFiles(displayFiles)
+      }
+    ];
+  }
+
+  const grouped = new Map<string, DisplayFile[]>();
+  const ungrouped: DisplayFile[] = [];
+
+  for (const file of displayFiles) {
+    const parts = file.displayPath.split("/");
+    const folder = parts[0] ?? "";
+    if (folder && !sizePattern.test(folder)) {
+      const trimmed = parts.slice(1).join("/");
+      const entry = {
+        path: file.path,
+        displayPath: trimmed || file.displayPath
+      };
+      const bucket = grouped.get(folder);
+      if (bucket) {
+        bucket.push(entry);
+      } else {
+        grouped.set(folder, [entry]);
+      }
+    } else {
+      ungrouped.push(file);
+    }
+  }
+
+  const groups: BannerGroup[] = [];
+  const sortedNames = Array.from(grouped.keys()).sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+  for (const name of sortedNames) {
+    const banners = extractBannersFromFiles(grouped.get(name) ?? [], name);
+    if (banners.length) {
+      groups.push({ id: name, label: name, banners });
+    }
+  }
+
+  if (ungrouped.length) {
+    const banners = extractBannersFromFiles(ungrouped, "other");
+    if (banners.length) {
+      groups.push({ id: "other", label: "Other", banners });
+    }
+  }
+
+  return groups;
+}
+
+function buildReviewHtml(groups: BannerGroup[], id: string) {
+  const groupData = JSON.stringify(groups);
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -198,6 +292,19 @@ function buildReviewHtml(banners: Banner[], id: string) {
         max-width: 1200px;
         margin: 0 auto;
         padding: 48px 24px 48px;
+      }
+
+      .group {
+        margin-bottom: 32px;
+      }
+
+      .group-title {
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
       }
 
       .grid {
@@ -293,6 +400,10 @@ function buildReviewHtml(banners: Banner[], id: string) {
         display: block;
       }
 
+      body.is-focused .group-title {
+        display: none;
+      }
+
       body.is-focused .banner-card {
         display: none;
       }
@@ -338,11 +449,11 @@ function buildReviewHtml(banners: Banner[], id: string) {
       </div>
     </div>
     <main>
-      <div id="grid" class="grid"></div>
+      <div id="grid"></div>
       <div id="empty" class="empty" hidden>No banner HTML files found.</div>
     </main>
     <script>
-      const banners = ${bannerData};
+      const groups = ${groupData};
 
       const grid = document.getElementById("grid");
       const empty = document.getElementById("empty");
@@ -450,7 +561,7 @@ function buildReviewHtml(banners: Banner[], id: string) {
       function createCard(banner) {
         const card = document.createElement("article");
         card.className = "banner-card";
-        card.dataset.bannerId = banner.id;
+        card.dataset.bannerId = banner.key;
         card.tabIndex = -1;
 
         const header = document.createElement("div");
@@ -493,9 +604,9 @@ function buildReviewHtml(banners: Banner[], id: string) {
         iframe.src = banner.path;
         iframe.title = banner.label;
 
-        const size = banner.id.split("x");
-        iframe.width = size[0] || "300";
-        iframe.height = size[1] || "250";
+        const sizeMatch = banner.id.match(/^(\\d+)x(\\d+)$/);
+        iframe.width = sizeMatch ? sizeMatch[1] : "300";
+        iframe.height = sizeMatch ? sizeMatch[2] : "250";
         iframe.loading = "lazy";
 
         frame.appendChild(iframe);
@@ -519,11 +630,11 @@ function buildReviewHtml(banners: Banner[], id: string) {
 
         focusButton.addEventListener("click", (event) => {
           event.stopPropagation();
-          location.hash = banner.id;
+          location.hash = banner.key;
         });
 
         card.addEventListener("click", () => {
-          location.hash = banner.id;
+          location.hash = banner.key;
         });
 
         iframe.addEventListener("load", () => {
@@ -613,11 +724,27 @@ function buildReviewHtml(banners: Banner[], id: string) {
 
       backButton.addEventListener("click", clearHash);
 
-      if (!banners.length) {
+      const hasBanners = groups.some((group) => group.banners && group.banners.length);
+      if (!hasBanners) {
         empty.hidden = false;
       } else {
-        banners.forEach((banner) => {
-          grid.appendChild(createCard(banner));
+        groups.forEach((group) => {
+          if (!group.banners || !group.banners.length) return;
+          const section = document.createElement("section");
+          section.className = "group";
+          if (group.label) {
+            const title = document.createElement("h2");
+            title.className = "group-title";
+            title.textContent = group.label;
+            section.appendChild(title);
+          }
+          const groupGrid = document.createElement("div");
+          groupGrid.className = "grid";
+          group.banners.forEach((banner) => {
+            groupGrid.appendChild(createCard(banner));
+          });
+          section.appendChild(groupGrid);
+          grid.appendChild(section);
         });
       }
 
@@ -726,8 +853,8 @@ export async function GET(
 
       const metaText = await new Response(metaBody).text();
       const meta = JSON.parse(metaText) as { files?: MetaFile[] };
-      const banners = extractBanners(meta.files ?? []);
-      const html = buildReviewHtml(banners, params.id);
+      const groups = extractBannerGroups(meta.files ?? []);
+      const html = buildReviewHtml(groups, params.id);
 
       const headers = new Headers();
       headers.set("Content-Type", "text/html; charset=utf-8");
