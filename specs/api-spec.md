@@ -13,11 +13,7 @@ Creates a new review session.
 {
   "id": "abc123",
   "basePath": "reviews/abc123/",
-  "reviewUrl": "https://domain.com/r/abc123/review.html",
-  "constraints": {
-    "maxFileSize": 5242880,
-    "maxTotalSize": 50000000
-  }
+  "reviewUrl": "https://domain.com/r/abc123/review.html"
 }
 
 ---

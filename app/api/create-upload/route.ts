@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { MAX_FILE_SIZE, MAX_TOTAL_SIZE } from "@/lib/constants";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -28,10 +26,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     id,
     basePath,
-    reviewUrl,
-    constraints: {
-      maxFileSize: MAX_FILE_SIZE,
-      maxTotalSize: MAX_TOTAL_SIZE
-    }
+    reviewUrl
   });
 }

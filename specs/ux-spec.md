@@ -17,7 +17,6 @@
 
 ### Errors (Examples)
 - “ZIP is missing review.html”
-- “ZIP is larger than 50 MB”
 - “No banner HTML files found”
 
 ## Success Screen

@@ -18,7 +18,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { MAX_FILE_SIZE, MAX_TOTAL_SIZE } from "@/lib/constants";
 import { normalizeUploadPath } from "@/lib/paths";
 
 const helperText = "Upload a ZIP of animation files.";
@@ -112,12 +111,6 @@ export default function Home() {
         return;
       }
 
-      if (file.size > MAX_TOTAL_SIZE) {
-        setError("ZIP is larger than 50 MB");
-        setPhase("error");
-        return;
-      }
-
       setPhase("extracting");
       setProgress({
         label: "Extracting ZIP…",
@@ -164,12 +157,6 @@ export default function Home() {
         }
 
         const bytes = data.length;
-        if (bytes > MAX_FILE_SIZE) {
-          setError("One or more files exceed 5 MB");
-          setPhase("error");
-          return false;
-        }
-
         totalBytes += bytes;
         files.push({
           path: normalized,
@@ -217,12 +204,6 @@ export default function Home() {
 
       if (!hasBannerHtml) {
         setError("No banner HTML files found");
-        setPhase("error");
-        return;
-      }
-
-      if (totalBytes > MAX_TOTAL_SIZE) {
-        setError("ZIP is larger than 50 MB");
         setPhase("error");
         return;
       }
