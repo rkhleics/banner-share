@@ -7,6 +7,7 @@ import {
   getStorageClient,
   requireStorageBucket
 } from "@/lib/storage";
+import { detectBannerSizeFromPath } from "@/lib/banner-size";
 import { isValidId, normalizeUploadPath } from "@/lib/paths";
 
 export const runtime = "nodejs";
@@ -14,7 +15,14 @@ export const dynamic = "force-dynamic";
 
 type MetaFile = { path: string; bytes?: number };
 
-type Banner = { id: string; label: string; path: string; key: string };
+type Banner = {
+  id: string;
+  label: string;
+  path: string;
+  key: string;
+  width: number;
+  height: number;
+};
 
 type BannerGroup = { id: string; label: string; banners: Banner[] };
 
@@ -38,9 +46,28 @@ function makeBannerKey(prefix: string | null, id: string) {
   return encodeURIComponent(raw);
 }
 
+function buildBanner(
+  id: string,
+  path: string,
+  keyPrefix?: string,
+  width = 300,
+  height = 250
+): Banner {
+  return {
+    id,
+    label: sizeLabel(id),
+    path: `./${path}`,
+    key: makeBannerKey(keyPrefix ?? null, id),
+    width,
+    height
+  };
+}
+
 function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
-  const sizePattern = /^\d+x\d+$/;
-  const bySize = new Map<string, { path: string; weight: number }>();
+  const bySize = new Map<
+    string,
+    { path: string; weight: number; width: number; height: number }
+  >();
   const fallback: Banner[] = [];
 
   for (const file of files) {
@@ -52,31 +79,30 @@ function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
     const parts = displayPath.split("/");
     const folder = parts[0] ?? "";
     const fileName = parts[parts.length - 1] ?? "";
+    const detectedSize =
+      detectBannerSizeFromPath(folder) ?? detectBannerSizeFromPath(displayPath);
 
-    if (sizePattern.test(folder)) {
+    if (detectedSize) {
       const weight = fileName.toLowerCase() === "index.html" ? 2 : 1;
-      const current = bySize.get(folder);
+      const current = bySize.get(detectedSize.id);
       if (!current || weight > current.weight) {
-        bySize.set(folder, { path, weight });
+        bySize.set(detectedSize.id, {
+          path,
+          weight,
+          width: detectedSize.width,
+          height: detectedSize.height
+        });
       }
       continue;
     }
 
     const id = folder || fileName.replace(/\.html$/i, "");
-    fallback.push({
-      id,
-      label: sizeLabel(id),
-      path: `./${path}`,
-      key: makeBannerKey(keyPrefix ?? null, id)
-    });
+    fallback.push(buildBanner(id, path, keyPrefix));
   }
 
   const banners: Banner[] = bySize.size
     ? Array.from(bySize.entries()).map(([id, data]) => ({
-        id,
-        label: sizeLabel(id),
-        path: `./${data.path}`,
-        key: makeBannerKey(keyPrefix ?? null, id)
+        ...buildBanner(id, data.path, keyPrefix, data.width, data.height)
       }))
     : fallback;
 
@@ -101,7 +127,6 @@ function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
 }
 
 function extractBannerGroups(files: MetaFile[]) {
-  const sizePattern = /^\d+x\d+$/;
   const topLevelFolders = new Set<string>();
 
   for (const file of files) {
@@ -134,7 +159,7 @@ function extractBannerGroups(files: MetaFile[]) {
     const displayPath = stripPrefix(path);
     const parts = displayPath.split("/");
     const folder = parts[0] ?? "";
-    if (folder && !sizePattern.test(folder)) {
+    if (folder && !detectBannerSizeFromPath(folder)) {
       groupNames.add(folder);
     }
 
@@ -162,7 +187,7 @@ function extractBannerGroups(files: MetaFile[]) {
   for (const file of displayFiles) {
     const parts = file.displayPath.split("/");
     const folder = parts[0] ?? "";
-    if (folder && !sizePattern.test(folder)) {
+    if (folder && !detectBannerSizeFromPath(folder)) {
       const trimmed = parts.slice(1).join("/");
       const entry = {
         path: file.path,
@@ -603,10 +628,8 @@ function buildReviewHtml(groups: BannerGroup[], id: string) {
         const iframe = document.createElement("iframe");
         iframe.src = banner.path;
         iframe.title = banner.label;
-
-        const sizeMatch = banner.id.match(/^(\\d+)x(\\d+)$/);
-        iframe.width = sizeMatch ? sizeMatch[1] : "300";
-        iframe.height = sizeMatch ? sizeMatch[2] : "250";
+        iframe.width = String(banner.width);
+        iframe.height = String(banner.height);
         iframe.loading = "lazy";
 
         frame.appendChild(iframe);
