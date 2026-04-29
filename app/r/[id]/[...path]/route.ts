@@ -7,7 +7,11 @@ import {
   getStorageClient,
   requireStorageBucket
 } from "@/lib/storage";
-import { detectBannerSizeFromPath } from "@/lib/banner-size";
+import {
+  type BannerSize,
+  detectBannerSizeFromHtml,
+  detectBannerSizeFromPath
+} from "@/lib/banner-size";
 import { isValidId, normalizeUploadPath } from "@/lib/paths";
 
 export const runtime = "nodejs";
@@ -27,6 +31,7 @@ type Banner = {
 type BannerGroup = { id: string; label: string; banners: Banner[] };
 
 type DisplayFile = { path: string; displayPath: string };
+type BannerSizeResolver = (file: DisplayFile) => Promise<BannerSize | null>;
 
 function toWebStream(body: unknown) {
   if (!body) return null;
@@ -63,7 +68,11 @@ function buildBanner(
   };
 }
 
-function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
+async function extractBannersFromFiles(
+  files: DisplayFile[],
+  keyPrefix?: string,
+  resolveBannerSize?: BannerSizeResolver
+) {
   const bySize = new Map<
     string,
     { path: string; weight: number; width: number; height: number }
@@ -81,16 +90,17 @@ function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
     const fileName = parts[parts.length - 1] ?? "";
     const detectedSize =
       detectBannerSizeFromPath(folder) ?? detectBannerSizeFromPath(displayPath);
+    const resolvedSize = detectedSize ?? (await resolveBannerSize?.(file)) ?? null;
 
-    if (detectedSize) {
+    if (resolvedSize) {
       const weight = fileName.toLowerCase() === "index.html" ? 2 : 1;
-      const current = bySize.get(detectedSize.id);
+      const current = bySize.get(resolvedSize.id);
       if (!current || weight > current.weight) {
-        bySize.set(detectedSize.id, {
+        bySize.set(resolvedSize.id, {
           path,
           weight,
-          width: detectedSize.width,
-          height: detectedSize.height
+          width: resolvedSize.width,
+          height: resolvedSize.height
         });
       }
       continue;
@@ -126,7 +136,10 @@ function extractBannersFromFiles(files: DisplayFile[], keyPrefix?: string) {
   return banners;
 }
 
-function extractBannerGroups(files: MetaFile[]) {
+async function extractBannerGroups(
+  files: MetaFile[],
+  resolveBannerSize?: BannerSizeResolver
+) {
   const topLevelFolders = new Set<string>();
 
   for (const file of files) {
@@ -176,7 +189,11 @@ function extractBannerGroups(files: MetaFile[]) {
       {
         id: "all",
         label: "",
-        banners: extractBannersFromFiles(displayFiles)
+        banners: await extractBannersFromFiles(
+          displayFiles,
+          undefined,
+          resolveBannerSize
+        )
       }
     ];
   }
@@ -210,14 +227,22 @@ function extractBannerGroups(files: MetaFile[]) {
   );
 
   for (const name of sortedNames) {
-    const banners = extractBannersFromFiles(grouped.get(name) ?? [], name);
+    const banners = await extractBannersFromFiles(
+      grouped.get(name) ?? [],
+      name,
+      resolveBannerSize
+    );
     if (banners.length) {
       groups.push({ id: name, label: name, banners });
     }
   }
 
   if (ungrouped.length) {
-    const banners = extractBannersFromFiles(ungrouped, "other");
+    const banners = await extractBannersFromFiles(
+      ungrouped,
+      "other",
+      resolveBannerSize
+    );
     if (banners.length) {
       groups.push({ id: "other", label: "Other", banners });
     }
@@ -876,7 +901,49 @@ export async function GET(
 
       const metaText = await new Response(metaBody).text();
       const meta = JSON.parse(metaText) as { files?: MetaFile[] };
-      const groups = extractBannerGroups(meta.files ?? []);
+      const sizeCache = new Map<string, Promise<BannerSize | null>>();
+      const resolveBannerSizeFromHtml: BannerSizeResolver = (file) => {
+        const cached = sizeCache.get(file.path);
+        if (cached) return cached;
+
+        const pending = (async () => {
+          try {
+            const htmlResponse = await client.send(
+              new GetObjectCommand({
+                Bucket: bucket,
+                Key: buildStorageKey(params.id, file.path)
+              })
+            );
+
+            if (!htmlResponse.Body) {
+              return null;
+            }
+
+            const htmlBody = toWebStream(htmlResponse.Body) as unknown as ReadableStream;
+            if (!htmlBody) {
+              return null;
+            }
+
+            const html = await new Response(htmlBody).text();
+            return detectBannerSizeFromHtml(html);
+          } catch (error) {
+            const statusCode = (error as { $metadata?: { httpStatusCode?: number } })
+              ?.$metadata?.httpStatusCode;
+            if (statusCode === 404 || (error as { name?: string }).name === "NoSuchKey") {
+              return null;
+            }
+
+            throw error;
+          }
+        })();
+
+        sizeCache.set(file.path, pending);
+        return pending;
+      };
+      const groups = await extractBannerGroups(
+        meta.files ?? [],
+        resolveBannerSizeFromHtml
+      );
       const html = buildReviewHtml(groups, params.id);
 
       const headers = new Headers();
